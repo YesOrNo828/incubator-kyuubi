@@ -3248,4 +3248,26 @@ object KyuubiConf {
       .version("1.8.1")
       .booleanConf
       .createWithDefault(false)
+
+  val ENGINE_FLINK_INITIALIZE_SQL: ConfigEntry[Seq[String]] =
+    buildConf("kyuubi.engine.flink.initialize.sql")
+      .doc("SemiColon-separated list of SQL statements to be initialized in the newly created " +
+        "Flink engine before queries. i.e. use `SHOW DATABASES` to eagerly active Flink table env. This " +
+        "configuration can not be used in JDBC url due to the limitation of Beeline/JDBC driver. " +
+        "`kyuubi.engine.initialize.sql` is also available in Flink engine and execute initialize SQL firstly.")
+      .version("1.8.1")
+      .stringConf
+      .toSequence(";")
+      .createWithDefaultString("SHOW DATABASES")
+
+  val ENGINE_FLINK_SESSION_INITIALIZE_SQL: ConfigEntry[Seq[String]] =
+    buildConf("kyuubi.engine.flink.session.initialize.sql")
+      .doc("SemiColon-separated list of SQL statements to be initialized in the newly created " +
+        "Flink engine session before queries. This configuration can not be used in JDBC url due to " +
+        "the limitation of Beeline/JDBC driver. `kyuubi.engine.session.initialize.sql` " +
+        "is also available in Flink engine and execute initialize SQL firstly.")
+      .version("1.8.1")
+      .stringConf
+      .toSequence(";")
+      .createWithDefault(Nil)
 }

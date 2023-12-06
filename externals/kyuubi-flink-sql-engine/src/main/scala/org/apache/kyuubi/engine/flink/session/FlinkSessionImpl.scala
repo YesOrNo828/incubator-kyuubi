@@ -65,7 +65,11 @@ class FlinkSessionImpl(
   override def open(): Unit = {
     val executor = fSession.createExecutor(Configuration.fromMap(fSession.getSessionConfig))
 
-    sessionManager.getConf.get(ENGINE_SESSION_INITIALIZE_SQL).foreach { sql =>
+    val initializeSQLs =
+      sessionManager.getConf.get(ENGINE_SESSION_INITIALIZE_SQL) ++
+        sessionManager.getConf.get(ENGINE_FLINK_SESSION_INITIALIZE_SQL)
+
+    initializeSQLs.foreach { sql =>
       try {
         executor.executeStatement(OperationHandle.create, sql)
       } catch {

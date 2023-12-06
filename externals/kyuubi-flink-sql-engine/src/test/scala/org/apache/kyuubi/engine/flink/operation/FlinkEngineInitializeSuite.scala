@@ -34,6 +34,9 @@ class FlinkEngineInitializeSuite extends HiveJDBCTestHelper
   protected val ENGINE_INITIALIZE_SQL_VALUE: String =
     "show databases;"
 
+  protected val ENGINE_FLINK_INITIALIZE_SQL_VALUE: String =
+    "show tables;"
+
   protected val ENGINE_SESSION_INITIALIZE_SQL_VALUE: String =
     """create catalog cat_b with ('type'='generic_in_memory');
       |create table blackhole(i int) with ('connector'='blackhole');
@@ -42,6 +45,16 @@ class FlinkEngineInitializeSuite extends HiveJDBCTestHelper
       |'fields.i.kind'='sequence',
       |'fields.i.start'='1',
       |'fields.i.end'='10')""".stripMargin
+
+  protected val ENGINE_FLINK_SESSION_INITIALIZE_SQL_VALUE: String =
+    """create catalog cat_b1 with ('type'='generic_in_memory');
+      |create table blackhole1(i int) with ('connector'='blackhole');
+      |create table datagen1(i int) with (
+      |'connector'='datagen',
+      |'fields.i.kind'='sequence',
+      |'fields.i.start'='1',
+      |'fields.i.end'='10');
+      |create view v1 as select 1""".stripMargin
 
   override def withKyuubiConf: Map[String, String] = {
     Map(
@@ -54,7 +67,9 @@ class FlinkEngineInitializeSuite extends HiveJDBCTestHelper
       ENGINE_SHARE_LEVEL.key -> shareLevel,
       OPERATION_PLAN_ONLY_MODE.key -> NoneMode.name,
       ENGINE_INITIALIZE_SQL.key -> ENGINE_INITIALIZE_SQL_VALUE,
+      ENGINE_FLINK_INITIALIZE_SQL.key -> ENGINE_FLINK_INITIALIZE_SQL_VALUE,
       ENGINE_SESSION_INITIALIZE_SQL.key -> ENGINE_SESSION_INITIALIZE_SQL_VALUE,
+      ENGINE_FLINK_SESSION_INITIALIZE_SQL.key -> ENGINE_FLINK_SESSION_INITIALIZE_SQL_VALUE,
       KYUUBI_SESSION_USER_KEY -> "kandy")
   }
 
@@ -69,7 +84,7 @@ class FlinkEngineInitializeSuite extends HiveJDBCTestHelper
   test("execute statement - kyuubi engine initialize") {
     withJdbcStatement() { statement =>
       var resultSet = statement.executeQuery("show catalogs")
-      val expectedCatalogs = Set("default_catalog", "cat_b")
+      val expectedCatalogs = Set("default_catalog", "cat_b", "cat_b1")
       var actualCatalogs = Set[String]()
       while (resultSet.next()) {
         actualCatalogs += resultSet.getString(1)
@@ -81,24 +96,37 @@ class FlinkEngineInitializeSuite extends HiveJDBCTestHelper
       assert(resultSet.getString(1) === "default_database")
       assert(!resultSet.next())
 
-      val expectedTables = Set("blackhole", "datagen")
+      val expectedTables = Set("blackhole", "datagen", "blackhole1", "datagen1", "v1")
       resultSet = statement.executeQuery("show tables")
       while (resultSet.next()) {
         assert(expectedTables.contains(resultSet.getString(1)))
       }
       assert(!resultSet.next())
 
-      var dropResult = statement.executeQuery("drop catalog cat_b")
+      val expectedViews = Set("v1")
+      resultSet = statement.executeQuery("show views")
+      while (resultSet.next()) {
+        assert(expectedViews.contains(resultSet.getString(1)))
+      }
+      assert(!resultSet.next())
+
+      var dropResult = statement.executeQuery("drop view v1")
       assert(dropResult.next())
       assert(dropResult.getString(1) === "OK")
 
-      dropResult = statement.executeQuery("drop table blackhole")
-      assert(dropResult.next())
-      assert(dropResult.getString(1) === "OK")
+      val catalogs = Array("cat_b", "cat_b1")
+      catalogs.foreach { catalog =>
+        dropResult = statement.executeQuery(s"drop catalog $catalog")
+        assert(dropResult.next())
+        assert(dropResult.getString(1) === "OK")
+      }
 
-      dropResult = statement.executeQuery("drop table datagen")
-      assert(dropResult.next())
-      assert(dropResult.getString(1) === "OK")
+      val tables = Array("blackhole", "blackhole1", "datagen", "datagen1")
+      tables.foreach { table =>
+        dropResult = statement.executeQuery(s"drop table $table")
+        assert(dropResult.next())
+        assert(dropResult.getString(1) === "OK")
+      }
     }
   }
 }
